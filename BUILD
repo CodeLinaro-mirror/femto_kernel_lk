@@ -1,7 +1,7 @@
-load("@bazel_tools//tools/python:toolchain.bzl", "py_runtime_pair")
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 
-clang = "prebuilts/clang/host/linux-x86/clang-r498229b"
+# TODO: import clang as a toolchain
+clang = "prebuilts/clang/host/linux-x86/clang-r522817"
 
 make = "./prebuilts/build-tools/linux-x86/bin/make"
 
@@ -86,17 +86,4 @@ copy_to_dist_dir(
     data = [":qemu_arm64"],
     dist_dir = "out/lk/dist",
     flat = True,
-)
-
-# Use SWIG enabled Python
-py_runtime_pair(
-    name = "py_runtime_pair",
-    py2_runtime = "//prebuilts/build-tools:python2",
-    py3_runtime = "//{toolchain}:python3".format(toolchain = clang),
-)
-
-toolchain(
-    name = "py_toolchain",
-    toolchain = ":py_runtime_pair",
-    toolchain_type = "@bazel_tools//tools/python:toolchain_type",
 )
