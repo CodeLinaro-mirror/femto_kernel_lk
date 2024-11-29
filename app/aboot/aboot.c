@@ -3092,6 +3092,13 @@ int splash_screen_check_header(logo_img_header *header)
 		return -1;
 	if (header->width == 0 || header->height == 0)
 		return -1;
+	if ((UINT_MAX/512 >= header->blocks) && (header->blocks != 0)){
+		if (header->blocks*512 < header->width * header->height)
+			return -1;
+	}
+	else {
+		return -1;
+	}
 	return 0;
 }
 
@@ -3126,10 +3133,9 @@ int splash_screen_flash()
 
 	fb_display = fbcon_display();
 	if (fb_display) {
-		if (header->type && (header->blocks != 0) &&
-				(UINT_MAX >= header->blocks * 512) &&
-				((header->blocks * 512) <=  (fb_display->width *
-				fb_display->height * (fb_display->bpp / 8)))) {
+		if (header->type &&
+		     ((header->blocks * 512) <=  (fb_display->width *
+			fb_display->height * (fb_display->bpp / 8)))) {
 					/* RLE24 compressed data */
 			uint8_t *base = (uint8_t *) fb_display->base + LOGO_IMG_OFFSET;
 
@@ -3227,8 +3233,8 @@ int splash_screen_mmc()
 	}
 
 	if (fb_display) {
-		if (header->type && (header->blocks != 0) &&
-			(UINT_MAX >= header->blocks * 512 + LOGO_IMG_HEADER_SIZE) &&
+		if (header->type &&
+			(((UINT_MAX - LOGO_IMG_HEADER_SIZE) / 512) >= header->blocks) &&
 			((header->blocks * 512) <=  (fb_display->width *
 			fb_display->height * (fb_display->bpp / 8)))) {
 			/* 1 RLE24 compressed data */
