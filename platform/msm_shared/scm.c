@@ -1111,7 +1111,7 @@ int scm_random(uint32_t * rbuf, uint32_t  r_len)
 	}
 
 	//Copy back into the return buffer
-	memcpy(rbuf, rand_buf, r_len);
+	memscpy(rbuf, r_len, rand_buf, sizeof(rand_buf));
 	return ret;
 }
 
