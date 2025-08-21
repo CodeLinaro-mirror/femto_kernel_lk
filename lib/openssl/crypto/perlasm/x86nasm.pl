@@ -1,11 +1,18 @@
-#!/usr/bin/env perl
+#! /usr/bin/env perl
+# Copyright 1999-2018 The OpenSSL Project Authors. All Rights Reserved.
+#
+# Licensed under the OpenSSL license (the "License").  You may not use
+# this file except in compliance with the License.  You can obtain a copy
+# in the file LICENSE in the source distribution or at
+# https://www.openssl.org/source/license.html
+
 
 package x86nasm;
 
 *out=\@::out;
 
 $::lbdecor="L\$";		# local label decoration
-$nmdecor=$::netware?"":"_";	# external name decoration
+$nmdecor="_";			# external name decoration
 $drdecor=$::mwerks?".":"";	# directive decoration
 
 $initseg="";
@@ -19,6 +26,8 @@ sub ::generic
 	{   $_[0] = "NEAR $_[0]";   	}
 	elsif ($opcode eq "lea" && $#_==1)  # wipe storage qualifier from lea
 	{   $_[1] =~ s/^[^\[]*\[/\[/o;	}
+	elsif ($opcode eq "clflush" && $#_==0)
+	{   $_[0] =~ s/^[^\[]*\[/\[/o;	}
     }
     &::emit($opcode,@_);
   1;
@@ -33,6 +42,8 @@ sub ::jmp_ptr	{ &::emit("jmp",@_);	}
 sub get_mem
 { my($size,$addr,$reg1,$reg2,$idx)=@_;
   my($post,$ret);
+
+    if (!defined($idx) && 1*$reg2) { $idx=$reg2; $reg2=$reg1; undef $reg1; }
 
     if ($size ne "")
     {	$ret .= "$size";
@@ -67,6 +78,7 @@ sub get_mem
 }
 sub ::BP	{ &get_mem("BYTE",@_);  }
 sub ::DWP	{ &get_mem("DWORD",@_); }
+sub ::WP	{ &get_mem("WORD",@_);	}
 sub ::QWP	{ &get_mem("",@_);      }
 sub ::BC	{ (($::mwerks)?"":"BYTE ")."@_";  }
 sub ::DWC	{ (($::mwerks)?"":"DWORD ")."@_"; }
@@ -114,13 +126,13 @@ sub ::file_end
 {   if (grep {/\b${nmdecor}OPENSSL_ia32cap_P\b/i} @out)
     {	my $comm=<<___;
 ${drdecor}segment	.bss
-${drdecor}common	${nmdecor}OPENSSL_ia32cap_P 4
+${drdecor}common	${nmdecor}OPENSSL_ia32cap_P 16
 ___
 	# comment out OPENSSL_ia32cap_P declarations
 	grep {s/(^extern\s+${nmdecor}OPENSSL_ia32cap_P)/\;$1/} @out;
 	push (@out,$comm)
     }
-    push (@out,$initseg) if ($initseg);		
+    push (@out,$initseg) if ($initseg);
 }
 
 sub ::comment {   foreach (@_) { push(@out,"\t; $_\n"); }   }
@@ -135,7 +147,8 @@ sub ::public_label
 
 sub ::data_byte
 {   push(@out,(($::mwerks)?".byte\t":"db\t").join(',',@_)."\n");	}
-
+sub ::data_short
+{   push(@out,(($::mwerks)?".word\t":"dw\t").join(',',@_)."\n");	}
 sub ::data_word
 {   push(@out,(($::mwerks)?".long\t":"dd\t").join(',',@_)."\n");	}
 
@@ -161,6 +174,13 @@ ___
 sub ::dataseg
 {   if ($mwerks)	{ push(@out,".section\t.data,4\n");   }
     else		{ push(@out,"section\t.data align=4\n"); }
+}
+
+sub ::safeseh
+{ my $nm=shift;
+    push(@out,"%if	__NASM_VERSION_ID__ >= 0x02030000\n");
+    push(@out,"safeseh	".&::LABEL($nm,$nmdecor.$nm)."\n");
+    push(@out,"%endif\n");
 }
 
 1;
