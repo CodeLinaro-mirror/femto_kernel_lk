@@ -4,12 +4,13 @@ LOCAL_DIR:= $(GET_LOCAL_DIR)
 CFLAGS += -DOPENSSL_BN_ASM_MONT -DAES_ASM -DSHA1_ASM -DSHA256_ASM -DSHA512_ASM \
 	-DOPENSSL_NO_STDIO -DOPENSSL_NO_FP_API -DNO_WINDOWS_BRAINDEATH \
 	-DOPENSSL_IMPLEMENTS_strncasecmp -DOPENSSL_NO_DSA -DOPENSSL_NO_DH \
-	-DGETPID_IS_MEANINGLESS -DOPENSSL_NO_EC -DOPENSSL_NO_DES
+	-DGETPID_IS_MEANINGLESS -DOPENSSL_NO_EC -DOPENSSL_NO_DES -DOPENSSL_NO_CMAC -DOPENSSL_NO_POLY1305 -DOPENSSL_NO_SIPHASH -DOPENSSL_NO_SM2 -DOPENSSL_NO_SCRYPT
 
 INCLUDES += \
 			-I$(LOCAL_DIR) \
 			-I$(LOCAL_DIR)/asn1 \
 			-I$(LOCAL_DIR)/evp \
+			-I$(LOCAL_DIR)/modes \
 			-I$(LOCAL_DIR)/x509 \
 			-I$(LOCAL_DIR)/../.. \
 			-I$(LOCAL_DIR)/../include \
@@ -24,25 +25,23 @@ OBJS += \
 	$(LOCAL_DIR)/mem.o \
 	$(LOCAL_DIR)/mem_clr.o \
 	$(LOCAL_DIR)/mem_dbg.o \
-	$(LOCAL_DIR)/cversion.o \
+	$(LOCAL_DIR)/ctype.o \
+	$(LOCAL_DIR)/mem_sec.o \
+	$(LOCAL_DIR)/threads_none.o \
 	$(LOCAL_DIR)/ex_data.o \
 	$(LOCAL_DIR)/cpt_err.o \
 	$(LOCAL_DIR)/ebcdic.o \
 	$(LOCAL_DIR)/o_str.o \
 	$(LOCAL_DIR)/aes/aes_cbc.o \
 	$(LOCAL_DIR)/aes/aes_cfb.o \
-	$(LOCAL_DIR)/aes/aes_ctr.o \
 	$(LOCAL_DIR)/aes/aes_ecb.o \
 	$(LOCAL_DIR)/aes/aes_misc.o \
 	$(LOCAL_DIR)/aes/aes_ofb.o \
 	$(LOCAL_DIR)/aes/aes_wrap.o \
 	$(LOCAL_DIR)/asn1/a_bitstr.o \
-	$(LOCAL_DIR)/asn1/a_bool.o \
-	$(LOCAL_DIR)/asn1/a_bytes.o \
 	$(LOCAL_DIR)/asn1/a_d2i_fp.o \
 	$(LOCAL_DIR)/asn1/a_digest.o \
 	$(LOCAL_DIR)/asn1/a_dup.o \
-	$(LOCAL_DIR)/asn1/a_enum.o \
 	$(LOCAL_DIR)/asn1/a_i2d_fp.o \
 	$(LOCAL_DIR)/asn1/a_int.o \
 	$(LOCAL_DIR)/asn1/a_mbstr.o \
@@ -68,7 +67,6 @@ OBJS += \
 	$(LOCAL_DIR)/asn1/d2i_pr.o \
 	$(LOCAL_DIR)/asn1/d2i_pu.o \
 	$(LOCAL_DIR)/asn1/evp_asn1.o \
-	$(LOCAL_DIR)/asn1/f_enum.o \
 	$(LOCAL_DIR)/asn1/f_int.o \
 	$(LOCAL_DIR)/asn1/f_string.o \
 	$(LOCAL_DIR)/asn1/i2d_pr.o \
@@ -79,11 +77,8 @@ OBJS += \
 	$(LOCAL_DIR)/asn1/p5_pbev2.o \
 	$(LOCAL_DIR)/asn1/p8_pkey.o \
 	$(LOCAL_DIR)/asn1/t_bitst.o \
-	$(LOCAL_DIR)/asn1/t_crl.o \
-	$(LOCAL_DIR)/asn1/t_req.o \
+	$(LOCAL_DIR)/asn1/t_pkey.o \
 	$(LOCAL_DIR)/asn1/t_spki.o \
-	$(LOCAL_DIR)/asn1/t_x509.o \
-	$(LOCAL_DIR)/asn1/t_x509a.o \
 	$(LOCAL_DIR)/asn1/tasn_enc.o \
 	$(LOCAL_DIR)/asn1/tasn_dec.o \
 	$(LOCAL_DIR)/asn1/tasn_fre.o \
@@ -92,22 +87,14 @@ OBJS += \
 	$(LOCAL_DIR)/asn1/tasn_typ.o \
 	$(LOCAL_DIR)/asn1/tasn_utl.o \
 	$(LOCAL_DIR)/asn1/x_algor.o \
-	$(LOCAL_DIR)/asn1/x_attrib.o \
 	$(LOCAL_DIR)/asn1/x_bignum.o \
-	$(LOCAL_DIR)/asn1/x_crl.o \
-	$(LOCAL_DIR)/asn1/x_exten.o \
 	$(LOCAL_DIR)/asn1/x_info.o \
+	$(LOCAL_DIR)/asn1/x_int64.o \
 	$(LOCAL_DIR)/asn1/x_long.o \
-	$(LOCAL_DIR)/asn1/x_name.o \
-	$(LOCAL_DIR)/asn1/x_nx509.o \
 	$(LOCAL_DIR)/asn1/x_pkey.o \
-	$(LOCAL_DIR)/asn1/x_pubkey.o \
-	$(LOCAL_DIR)/asn1/x_req.o \
 	$(LOCAL_DIR)/asn1/x_sig.o \
 	$(LOCAL_DIR)/asn1/x_spki.o \
 	$(LOCAL_DIR)/asn1/x_val.o \
-	$(LOCAL_DIR)/asn1/x_x509.o \
-	$(LOCAL_DIR)/asn1/x_x509a.o \
 	$(LOCAL_DIR)/bf/bf_cfb64.o \
 	$(LOCAL_DIR)/bf/bf_ecb.o \
 	$(LOCAL_DIR)/bf/bf_enc.o \
@@ -122,7 +109,7 @@ OBJS += \
 	$(LOCAL_DIR)/bn/bn_exp.o \
 	$(LOCAL_DIR)/bn/bn_exp2.o \
 	$(LOCAL_DIR)/bn/bn_gcd.o \
-	$(LOCAL_DIR)/bn/bn_gf2m.o \
+	$(LOCAL_DIR)/bn/bn_intern.o \
 	$(LOCAL_DIR)/bn/bn_kron.o \
 	$(LOCAL_DIR)/bn/bn_lib.o \
 	$(LOCAL_DIR)/bn/bn_mod.o \
@@ -147,7 +134,6 @@ OBJS += \
 	$(LOCAL_DIR)/err/err.o \
 	$(LOCAL_DIR)/err/err_all.o \
 	$(LOCAL_DIR)/err/err_prn.o \
-	$(LOCAL_DIR)/evp/c_all.o \
 	$(LOCAL_DIR)/evp/c_allc.o \
 	$(LOCAL_DIR)/evp/c_alld.o \
 	$(LOCAL_DIR)/evp/digest.o \
@@ -162,15 +148,12 @@ OBJS += \
 	$(LOCAL_DIR)/evp/e_rc5.o \
 	$(LOCAL_DIR)/evp/e_xcbc_d.o \
 	$(LOCAL_DIR)/evp/encode.o \
-	$(LOCAL_DIR)/evp/evp_acnf.o \
 	$(LOCAL_DIR)/evp/evp_enc.o \
 	$(LOCAL_DIR)/evp/evp_err.o \
 	$(LOCAL_DIR)/evp/evp_key.o \
 	$(LOCAL_DIR)/evp/evp_lib.o \
 	$(LOCAL_DIR)/evp/evp_pbe.o \
 	$(LOCAL_DIR)/evp/evp_pkey.o \
-	$(LOCAL_DIR)/evp/m_dss.o \
-	$(LOCAL_DIR)/evp/m_dss1.o \
 	$(LOCAL_DIR)/evp/m_mdc2.o \
 	$(LOCAL_DIR)/evp/m_null.o \
 	$(LOCAL_DIR)/evp/m_ripemd.o \
@@ -210,12 +193,10 @@ OBJS += \
 	$(LOCAL_DIR)/pkcs12/p12_attr.o \
 	$(LOCAL_DIR)/pkcs12/p12_crpt.o \
 	$(LOCAL_DIR)/pkcs12/p12_crt.o \
-	$(LOCAL_DIR)/pkcs12/p12_decr.o \
 	$(LOCAL_DIR)/pkcs12/p12_init.o \
 	$(LOCAL_DIR)/pkcs12/p12_key.o \
 	$(LOCAL_DIR)/pkcs12/p12_kiss.o \
 	$(LOCAL_DIR)/pkcs12/p12_mutl.o \
-	$(LOCAL_DIR)/pkcs12/p12_npas.o \
 	$(LOCAL_DIR)/pkcs12/p12_p8d.o \
 	$(LOCAL_DIR)/pkcs12/p12_p8e.o \
 	$(LOCAL_DIR)/pkcs12/p12_utl.o \
@@ -239,12 +220,14 @@ OBJS += \
 	$(LOCAL_DIR)/rsa/rsa_ameth.o \
 	$(LOCAL_DIR)/rsa/rsa_asn1.o \
 	$(LOCAL_DIR)/rsa/rsa_chk.o \
-	$(LOCAL_DIR)/rsa/rsa_eay.o \
+	$(LOCAL_DIR)/rsa/rsa_crpt.o \
 	$(LOCAL_DIR)/rsa/rsa_err.o \
 	$(LOCAL_DIR)/rsa/rsa_gen.o \
 	$(LOCAL_DIR)/rsa/rsa_lib.o \
+	$(LOCAL_DIR)/rsa/rsa_mp.o \
 	$(LOCAL_DIR)/rsa/rsa_none.o \
-	$(LOCAL_DIR)/rsa/rsa_null.o \
+	$(LOCAL_DIR)/rsa/rsa_ossl.o \
+	$(LOCAL_DIR)/rsa/rsa_oaep.o \
 	$(LOCAL_DIR)/rsa/rsa_pk1.o \
 	$(LOCAL_DIR)/rsa/rsa_pmeth.o \
 	$(LOCAL_DIR)/rsa/rsa_prn.o \
@@ -256,7 +239,6 @@ OBJS += \
 	$(LOCAL_DIR)/sha/sha1dgst.o \
 	$(LOCAL_DIR)/sha/sha256.o \
 	$(LOCAL_DIR)/sha/sha512.o \
-	$(LOCAL_DIR)/sha/sha_dgst.o \
 	$(LOCAL_DIR)/stack/stack.o \
 	$(LOCAL_DIR)/ts/ts_err.o \
 	$(LOCAL_DIR)/txt_db/txt_db.o \
@@ -268,10 +250,17 @@ OBJS += \
 	$(LOCAL_DIR)/x509/x509_ext.o \
 	$(LOCAL_DIR)/x509/x509_lu.o \
 	$(LOCAL_DIR)/x509/x509_obj.o \
+	$(LOCAL_DIR)/x509/x_x509.o \
+	$(LOCAL_DIR)/x509/x_x509a.o \
+	$(LOCAL_DIR)/x509/x_exten.o \
+	$(LOCAL_DIR)/x509/x_name.o \
+	$(LOCAL_DIR)/x509/x_pubkey.o \
+	$(LOCAL_DIR)/x509/x_attrib.o \
 	$(LOCAL_DIR)/x509/x509_r2x.o \
 	$(LOCAL_DIR)/x509/x509_req.o \
 	$(LOCAL_DIR)/x509/x509_set.o \
 	$(LOCAL_DIR)/x509/x509_trs.o \
+	$(LOCAL_DIR)/x509/t_x509.o \
 	$(LOCAL_DIR)/x509/x509_txt.o \
 	$(LOCAL_DIR)/x509/x509_v3.o \
 	$(LOCAL_DIR)/x509/x509_vfy.o \
@@ -290,7 +279,6 @@ OBJS += \
 	$(LOCAL_DIR)/x509v3/pcy_tree.o \
 	$(LOCAL_DIR)/x509v3/v3_akey.o \
 	$(LOCAL_DIR)/x509v3/v3_akeya.o \
-	$(LOCAL_DIR)/x509v3/v3_alt.o \
 	$(LOCAL_DIR)/x509v3/v3_bcons.o \
 	$(LOCAL_DIR)/x509v3/v3_bitst.o \
 	$(LOCAL_DIR)/x509v3/v3_conf.o \
@@ -304,7 +292,6 @@ OBJS += \
 	$(LOCAL_DIR)/x509v3/v3_int.o \
 	$(LOCAL_DIR)/x509v3/v3_lib.o \
 	$(LOCAL_DIR)/x509v3/v3_ncons.o \
-	$(LOCAL_DIR)/x509v3/v3_ocsp.o \
 	$(LOCAL_DIR)/x509v3/v3_pci.o \
 	$(LOCAL_DIR)/x509v3/v3_pcia.o \
 	$(LOCAL_DIR)/x509v3/v3_pcons.o \
@@ -340,7 +327,6 @@ removed_source_files := uid.o o_time.o o_dir.o \
 	$(LOCAL_DIR)/bio/bf_buff.o \
 	$(LOCAL_DIR)/bio/bf_nbio.o \
 	$(LOCAL_DIR)/bio/bf_null.o \
-	$(LOCAL_DIR)/bio/bio_cb.o \
 	$(LOCAL_DIR)/bio/bio_err.o \
 	$(LOCAL_DIR)/bio/bio_lib.o \
 	$(LOCAL_DIR)/bio/bss_acpt.o \
@@ -489,7 +475,6 @@ removed_source_files := uid.o o_time.o o_dir.o \
 	$(LOCAL_DIR)/x509v3/v3_utl.o
 
 Files_removed_error_during_link := \
-	$(LOCAL_DIR)/rsa/rsa_oaep.o \
 	$(LOCAL_DIR)/rsa/rsa_ssl.o \
 	$(LOCAL_DIR)/bn/bn_rand.o \
 	$(LOCAL_DIR)/asn1/t_pkey.o

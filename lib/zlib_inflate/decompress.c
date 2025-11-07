@@ -80,7 +80,7 @@ int decompress(unsigned char *in_buf, unsigned int in_len,
 		dprintf(INFO, "the input data is not a gzip package.\n");
 		return rc;
 	}
-	if (out_buf_len < in_len) {
+	if (out_buf_len <= in_len) {
 		dprintf(INFO, "the avaiable length of out_buf is not enough.\n");
 		return rc;
 	}
@@ -98,8 +98,8 @@ int decompress(unsigned char *in_buf, unsigned int in_len,
 
 	/* skip over gzip header */
 	stream->next_in = in_buf + GZIP_HEADER_LEN;
-	stream->avail_in = out_buf_len - GZIP_HEADER_LEN;
-	/* skip over asciz filename */
+	stream->avail_in = in_len - GZIP_HEADER_LEN;
+	/* skip over ascii filename */
 	if (in_buf[3] & 0x8) {
 		for (i = 0; i < GZIP_FILENAME_LIMIT && *stream->next_in++; i++) {
 			if (stream->avail_in == 0) {

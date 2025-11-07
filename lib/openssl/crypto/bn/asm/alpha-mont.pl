@@ -1,7 +1,14 @@
-#!/usr/bin/env perl
+#! /usr/bin/env perl
+# Copyright 2006-2020 The OpenSSL Project Authors. All Rights Reserved.
+#
+# Licensed under the OpenSSL license (the "License").  You may not use
+# this file except in compliance with the License.  You can obtain a copy
+# in the file LICENSE in the source distribution or at
+# https://www.openssl.org/source/license.html
+
 #
 # ====================================================================
-# Written by Andy Polyakov <appro@fy.chalmers.se> for the OpenSSL
+# Written by Andy Polyakov <appro@openssl.org> for the OpenSSL
 # project. The module is, however, dual licensed under OpenSSL and
 # CRYPTOGAMS licenses depending on where you obtain it. For further
 # details see http://www.openssl.org/~appro/cryptogams/.
@@ -14,6 +21,9 @@
 # code provides approximately the same performance per GHz as AMD64.
 # I.e. if you compare 1GHz 21264 and 2GHz Opteron, you'll observe ~2x
 # difference.
+
+$output=pop;
+open STDOUT,">$output";
 
 # int bn_mul_mont(
 $rp="a0";	# BN_ULONG *rp,
@@ -41,8 +51,12 @@ $j="s4";
 $m1="s5";
 
 $code=<<___;
+#ifdef __linux__
+#include <asm/regdef.h>
+#else
 #include <asm.h>
 #include <regdef.h>
+#endif
 
 .text
 
@@ -76,7 +90,7 @@ bn_mul_mont:
 	ldq	$aj,8($ap)
 	subq	sp,AT,sp
 	ldq	$bi,0($bp)	# bp[0]
-	mov	-4096,AT
+	lda	AT,-4096(zero)	# mov	-4096,AT
 	ldq	$n0,0($n0)
 	and	sp,AT,sp
 
@@ -106,9 +120,9 @@ bn_mul_mont:
 .align	4
 .L1st:
 	.set	noreorder
-	ldq	$aj,($aj)
+	ldq	$aj,0($aj)
 	addl	$j,1,$j
-	ldq	$nj,($nj)
+	ldq	$nj,0($nj)
 	lda	$tp,8($tp)
 
 	addq	$alo,$hi0,$lo0
@@ -159,12 +173,12 @@ bn_mul_mont:
 .align	4
 .Louter:
 	s8addq	$i,$bp,$bi
-	ldq	$hi0,($ap)
+	ldq	$hi0,0($ap)
 	ldq	$aj,8($ap)
-	ldq	$bi,($bi)
-	ldq	$hi1,($np)
+	ldq	$bi,0($bi)
+	ldq	$hi1,0($np)
 	ldq	$nj,8($np)
-	ldq	$tj,(sp)
+	ldq	$tj,0(sp)
 
 	mulq	$hi0,$bi,$lo0
 	umulh	$hi0,$bi,$hi0
@@ -195,10 +209,10 @@ bn_mul_mont:
 	.set	noreorder
 	ldq	$tj,8($tp)	#L0
 	nop			#U1
-	ldq	$aj,($aj)	#L1
+	ldq	$aj,0($aj)	#L1
 	s8addq	$j,$np,$nj	#U0
 
-	ldq	$nj,($nj)	#L0
+	ldq	$nj,0($nj)	#L0
 	nop			#U1
 	addq	$alo,$hi0,$lo0	#L1
 	lda	$tp,8($tp)
@@ -247,7 +261,7 @@ bn_mul_mont:
 	addq	$hi1,v0,$hi1
 
 	addq	$hi1,$hi0,$lo1
-	stq	$j,($tp)
+	stq	$j,0($tp)
 	cmpult	$lo1,$hi0,$hi1
 	addq	$lo1,$tj,$lo1
 	cmpult	$lo1,$tj,AT
@@ -265,8 +279,8 @@ bn_mul_mont:
 	mov	0,$hi0		# clear borrow bit
 
 .align	4
-.Lsub:	ldq	$lo0,($tp)
-	ldq	$lo1,($np)
+.Lsub:	ldq	$lo0,0($tp)
+	ldq	$lo1,0($np)
 	lda	$tp,8($tp)
 	lda	$np,8($np)
 	subq	$lo0,$lo1,$lo1	# tp[i]-np[i]
@@ -274,7 +288,7 @@ bn_mul_mont:
 	subq	$lo1,$hi0,$lo0
 	cmpult	$lo1,$lo0,$hi0
 	or	$hi0,AT,$hi0
-	stq	$lo0,($rp)
+	stq	$lo0,0($rp)
 	cmpult	$tp,$tj,v0
 	lda	$rp,8($rp)
 	bne	v0,.Lsub
@@ -283,15 +297,12 @@ bn_mul_mont:
 	mov	sp,$tp
 	mov	$bp,$rp		# restore rp
 
-	and	sp,$hi0,$ap
-	bic	$bp,$hi0,$bp
-	bis	$bp,$ap,$ap	# ap=borrow?tp:rp
-
 .align	4
-.Lcopy:	ldq	$aj,($ap)	# copy or in-place refresh
+.Lcopy:	ldq	$aj,0($tp)	# conditional copy
+	ldq	$nj,0($rp)
 	lda	$tp,8($tp)
 	lda	$rp,8($rp)
-	lda	$ap,8($ap)
+	cmoveq	$hi0,$nj,$aj
 	stq	zero,-8($tp)	# zap tp
 	cmpult	$tp,$tj,AT
 	stq	$aj,-8($rp)
@@ -309,9 +320,9 @@ bn_mul_mont:
 	lda	sp,48(sp)
 	ret	(ra)
 .end	bn_mul_mont
-.rdata
-.asciiz	"Montgomery Multiplication for Alpha, CRYPTOGAMS by <appro\@openssl.org>"
+.ascii	"Montgomery Multiplication for Alpha, CRYPTOGAMS by <appro\@openssl.org>"
+.align	2
 ___
 
 print $code;
-close STDOUT;
+close STDOUT or die "error closing STDOUT: $!";

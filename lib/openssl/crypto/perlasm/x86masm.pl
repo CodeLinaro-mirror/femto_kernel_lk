@@ -1,4 +1,11 @@
-#!/usr/bin/env perl
+#! /usr/bin/env perl
+# Copyright 2007-2016 The OpenSSL Project Authors. All Rights Reserved.
+#
+# Licensed under the OpenSSL license (the "License").  You may not use
+# this file except in compliance with the License.  You can obtain a copy
+# in the file LICENSE in the source distribution or at
+# https://www.openssl.org/source/license.html
+
 
 package x86masm;
 
@@ -14,12 +21,14 @@ sub ::generic
 { my ($opcode,@arg)=@_;
 
     # fix hexadecimal constants
-    for (@arg) { s/0x([0-9a-f]+)/0$1h/oi; }
+    for (@arg) { s/(?<![\w\$\.])0x([0-9a-f]+)/0$1h/oi; }
 
-    if ($opcode !~ /movq/)
+    if ($opcode =~ /lea/ && @arg[1] =~ s/.*PTR\s+(\(.*\))$/OFFSET $1/)	# no []
+    {	$opcode="mov";	}
+    elsif ($opcode !~ /mov[dq]$/)
     {	# fix xmm references
-	$arg[0] =~ s/\b[A-Z]+WORD\s+PTR/XMMWORD PTR/i if ($arg[1]=~/\bxmm[0-7]\b/i);
-	$arg[1] =~ s/\b[A-Z]+WORD\s+PTR/XMMWORD PTR/i if ($arg[0]=~/\bxmm[0-7]\b/i);
+	$arg[0] =~ s/\b[A-Z]+WORD\s+PTR/XMMWORD PTR/i if ($arg[-1]=~/\bxmm[0-7]\b/i);
+	$arg[-1] =~ s/\b[A-Z]+WORD\s+PTR/XMMWORD PTR/i if ($arg[0]=~/\bxmm[0-7]\b/i);
     }
 
     &::emit($opcode,@arg);
@@ -31,10 +40,13 @@ sub ::generic
 sub ::call	{ &::emit("call",(&::islabel($_[0]) or "$nmdecor$_[0]")); }
 sub ::call_ptr	{ &::emit("call",@_);	}
 sub ::jmp_ptr	{ &::emit("jmp",@_);	}
+sub ::lock	{ &::data_byte(0xf0);	}
 
 sub get_mem
 { my($size,$addr,$reg1,$reg2,$idx)=@_;
   my($post,$ret);
+
+    if (!defined($idx) && 1*$reg2) { $idx=$reg2; $reg2=$reg1; undef $reg1; }
 
     $ret .= "$size PTR " if ($size ne "");
 
@@ -65,6 +77,7 @@ sub get_mem
   $ret;
 }
 sub ::BP	{ &get_mem("BYTE",@_);  }
+sub ::WP	{ &get_mem("WORD",@_);	}
 sub ::DWP	{ &get_mem("DWORD",@_); }
 sub ::QWP	{ &get_mem("QWORD",@_); }
 sub ::BC	{ "@_";  }
@@ -72,11 +85,10 @@ sub ::DWC	{ "@_"; }
 
 sub ::file
 { my $tmp=<<___;
-TITLE	$_[0].asm
 IF \@Version LT 800
 ECHO MASM version 8.00 or later is strongly recommended.
 ENDIF
-.486
+.686
 .MODEL	FLAT
 OPTION	DOTNAME
 IF \@Version LT 800
@@ -129,7 +141,7 @@ ___
     if (grep {/\b${nmdecor}OPENSSL_ia32cap_P\b/i} @out)
     {	my $comm=<<___;
 .bss	SEGMENT 'BSS'
-COMM	${nmdecor}OPENSSL_ia32cap_P:DWORD
+COMM	${nmdecor}OPENSSL_ia32cap_P:DWORD:4
 .bss	ENDS
 ___
 	# comment out OPENSSL_ia32cap_P declarations
@@ -154,10 +166,13 @@ sub ::public_label
 {   push(@out,"PUBLIC\t".&::LABEL($_[0],$nmdecor.$_[0])."\n");   }
 
 sub ::data_byte
-{   push(@out,("DB\t").join(',',@_)."\n");	}
+{   push(@out,("DB\t").join(',',splice(@_,0,16))."\n") while(@_);	}
+
+sub ::data_short
+{   push(@out,("DW\t").join(',',splice(@_,0,8))."\n") while(@_);	}
 
 sub ::data_word
-{   push(@out,("DD\t").join(',',@_)."\n");	}
+{   push(@out,("DD\t").join(',',splice(@_,0,4))."\n") while(@_);	}
 
 sub ::align
 {   push(@out,"ALIGN\t$_[0]\n");	}
@@ -180,5 +195,12 @@ ___
 
 sub ::dataseg
 {   push(@out,"$segment\tENDS\n_DATA\tSEGMENT\n"); $segment="_DATA";   }
+
+sub ::safeseh
+{ my $nm=shift;
+    push(@out,"IF \@Version GE 710\n");
+    push(@out,".SAFESEH	".&::LABEL($nm,$nmdecor.$nm)."\n");
+    push(@out,"ENDIF\n");
+}
 
 1;
