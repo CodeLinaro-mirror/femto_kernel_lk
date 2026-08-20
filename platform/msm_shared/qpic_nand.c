@@ -190,6 +190,10 @@ qpic_nand_check_status(uint32_t status)
 				status &= ~NAND_FLASH_OP_ERR;
 				qpic_nand_erased_status_reset(ce_array, 0);
 			}
+			else
+			{
+				dprintf(CRITICAL, "NAND_FLASH_OP_ERR\n");
+			}
 		}
 
 		/* ECC error flagged on an erased page read.
@@ -200,13 +204,16 @@ qpic_nand_check_status(uint32_t status)
 
 		dprintf(CRITICAL, "Nand Flash error. Status = 0x%x\n", status);
 
-		if (status & NAND_FLASH_TIMEOUT_ERR) {
-			dprintf(CRITICAL, "NAND_FLASH_TIMEOUT_ERR\n");
+		if (status & NAND_FLASH_TIMEOUT_ERR)
+		{
+			dprintf(CRITICAL, "NANDC_RESULT_TIMEOUT\n");
 			return NANDC_RESULT_TIMEOUT;
-		} else {
+		}
+		else
+		{
 			dprintf(CRITICAL, "NANDC_RESULT_FAILURE\n");
 			return NANDC_RESULT_FAILURE;
-		}
+                }
 	}
 
 	return NANDC_RESULT_SUCCESS;
@@ -918,7 +925,8 @@ nand_result_t qpic_nand_block_isbad(unsigned page)
 		if (qpic_nand_block_isbad_exec(&params, bad_block))
 		{
 			dprintf(CRITICAL,
-					"Could not read bad block value\n");
+					"Could not read bad block value for page %d in block %d\n",
+					page, blk);
 			return NANDC_RESULT_FAILURE;
 		}
 
@@ -1226,12 +1234,11 @@ qpic_nand_write_page(uint32_t pg_addr,
 	/* Check for errors */
 	for(unsigned i = 0; i < flash.cws_per_page; i++)
 	{
-		nand_ret = qpic_nand_check_status(status[i]);
-		if (nand_ret)
-		{
+		if (status[i]) {
 			dprintf(CRITICAL,
 					"Failed to write CW %d for page: %d\n",
 					i, pg_addr);
+			nand_ret = status[i];
 			break;
 		}
 	}
@@ -2042,6 +2049,12 @@ flash_read_ext(struct ptentry *ptn,
 		else if (result)
 		{
 			/* error from flash status */
+			dprintf(CRITICAL,
+					"start block = %u current block = %u Partition name %s\n",
+					start_block, current_block, ptn->name);
+			dprintf(CRITICAL,
+					"flash.num_pages_per_blk = %u flash.page_size = %u\n",
+					flash.num_pages_per_blk, flash.page_size);
 			return result;
 		}
 
